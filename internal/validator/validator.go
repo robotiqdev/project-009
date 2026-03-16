@@ -1,5 +1,10 @@
 package validator
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // ErrorKind represents the type of validation error.
 type ErrorKind int
 
@@ -33,15 +38,51 @@ type Command struct {
 	Args      []string
 }
 
+var validOps = map[string]int{
+	"add":      2,
+	"subtract": 2,
+	"multiply": 2,
+	"divide":   2,
+}
+
 // CommandValidator validates Command inputs.
 type CommandValidator struct{}
 
 // NewCommandValidator returns a new CommandValidator.
 func NewCommandValidator() *CommandValidator {
+	return &CommandValidator{}
+}
+
+func (v *CommandValidator) validateOperation(cmd Command) error {
+	if _, ok := validOps[cmd.Operation]; !ok {
+		return &ValidationError{
+			Kind:    ErrUnknownOperation,
+			Message: fmt.Sprintf("unknown operation %q; supported: add, subtract, multiply, divide", cmd.Operation),
+		}
+	}
 	return nil
 }
 
 // Validate validates a Command and returns a ValidatedCommand or a ValidationError.
 func (v *CommandValidator) Validate(cmd Command) (*ValidatedCommand, error) {
-	return nil, nil
+	if err := v.validateOperation(cmd); err != nil {
+		return nil, err
+	}
+
+	args := make([]float64, len(cmd.Args))
+	for i, a := range cmd.Args {
+		f, err := strconv.ParseFloat(a, 64)
+		if err != nil {
+			return nil, &ValidationError{
+				Kind:    ErrNotANumber,
+				Message: fmt.Sprintf("argument is not a number: %s", a),
+			}
+		}
+		args[i] = f
+	}
+
+	return &ValidatedCommand{
+		Operation: cmd.Operation,
+		Args:      args,
+	}, nil
 }
