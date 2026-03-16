@@ -1,7 +1,10 @@
 package repl
 
 import (
+	"bufio"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/workspace/repo/internal/validator"
 )
@@ -41,5 +44,31 @@ func New(p Parser, v Validator, e Engine) *Repl {
 // Run starts the REPL, reading from in and writing to out.
 // It loops until EOF or an exit/quit command is received.
 func (r *Repl) Run(in io.Reader, out io.Writer) {
-	// TODO: implement
+	scanner := bufio.NewScanner(in)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "exit" || line == "quit" {
+			return
+		}
+
+		cmd, err := r.parser.Parse(line)
+		if err != nil {
+			fmt.Fprintf(out, "Error: %s\n", err.Error())
+			continue
+		}
+
+		vcmd, err := r.validator.Validate(cmd)
+		if err != nil {
+			fmt.Fprintf(out, "Error: %s\n", err.Error())
+			continue
+		}
+
+		result, err := r.engine.Execute(vcmd.Operation, vcmd.Args)
+		if err != nil {
+			fmt.Fprintf(out, "Error: %s\n", err.Error())
+			continue
+		}
+
+		fmt.Fprintf(out, "%s\n", result.Formatted)
+	}
 }
