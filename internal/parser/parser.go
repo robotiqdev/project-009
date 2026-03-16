@@ -1,6 +1,9 @@
 package parser
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // ErrEmptyInput is returned when Parse is called with an empty or whitespace-only string.
 var ErrEmptyInput = errors.New("empty input")
@@ -27,5 +30,13 @@ func NewLineParser() *LineParser {
 // Parse splits line into fields; returns ErrEmptyInput if no fields found.
 // The first field is Operation, remaining fields are Args.
 func (p *LineParser) Parse(line string) (Command, error) {
-	panic("not implemented")
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return Command{}, ErrEmptyInput
+	}
+	args := []string{}
+	if len(fields) > 1 {
+		args = fields[1:]
+	}
+	return Command{Operation: fields[0], Args: args}, nil
 }
