@@ -21,7 +21,41 @@ func NewCalculator() *Calculator {
 	return &Calculator{}
 }
 
-// Execute is a stub that returns an error for all operations until implemented.
+func add(a, b float64) Result {
+	v := a + b
+	return Result{Value: v, Formatted: fmt.Sprintf("%.2f", v)}
+}
+
+func subtract(a, b float64) Result {
+	v := a - b
+	return Result{Value: v, Formatted: fmt.Sprintf("%.2f", v)}
+}
+
+func multiply(a, b float64) Result {
+	v := a * b
+	return Result{Value: v, Formatted: fmt.Sprintf("%.2f", v)}
+}
+
+// divide computes a/b. Division by zero is not passed here (validator catches it first),
+// but if it were, Go returns +Inf for float64 division by zero, not a panic.
+func divide(a, b float64) Result {
+	v := a / b
+	return Result{Value: v, Formatted: fmt.Sprintf("%.2f", v)}
+}
+
+// Execute dispatches to the appropriate arithmetic function based on operation.
+// Returns an error for unknown operations as a defensive guard.
 func (c *Calculator) Execute(operation string, args []float64) (Result, error) {
-	return Result{}, fmt.Errorf("not implemented: %s", operation)
+	switch operation {
+	case "add":
+		return add(args[0], args[1]), nil
+	case "subtract":
+		return subtract(args[0], args[1]), nil
+	case "multiply":
+		return multiply(args[0], args[1]), nil
+	case "divide":
+		return divide(args[0], args[1]), nil
+	default:
+		return Result{}, fmt.Errorf("unknown operation: %s", operation)
+	}
 }
