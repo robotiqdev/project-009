@@ -298,3 +298,147 @@ type mockEngine struct{}
 func (m *mockEngine) Execute(operation string, args []float64) (arithmetic.Result, error) {
 	return arithmetic.Result{}, nil
 }
+
+// TestFormatted_WholeNumbersUseTwoDecimalPlaces verifies that whole number results
+// are formatted as "X.00" (e.g. "3.00"), not as bare integers like "3".
+func TestFormatted_WholeNumbersUseTwoDecimalPlaces(t *testing.T) {
+	tests := []struct {
+		name          string
+		operation     string
+		args          []float64
+		wantFormatted string
+	}{
+		{
+			name:          "add(1.0, 2.0) = '3.00' not '3'",
+			operation:     "add",
+			args:          []float64{1.0, 2.0},
+			wantFormatted: "3.00",
+		},
+		{
+			name:          "subtract(10.0, 4.0) = '6.00' not '6'",
+			operation:     "subtract",
+			args:          []float64{10.0, 4.0},
+			wantFormatted: "6.00",
+		},
+		{
+			name:          "multiply(3.0, 4.0) = '12.00' not '12'",
+			operation:     "multiply",
+			args:          []float64{3.0, 4.0},
+			wantFormatted: "12.00",
+		},
+		{
+			name:          "divide(6.0, 2.0) = '3.00' not '3'",
+			operation:     "divide",
+			args:          []float64{6.0, 2.0},
+			wantFormatted: "3.00",
+		},
+	}
+	calc := arithmetic.NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := calc.Execute(tt.operation, tt.args)
+			if err != nil {
+				t.Fatalf("Execute(%q, %v) unexpected error: %v", tt.operation, tt.args, err)
+			}
+			if result.Formatted != tt.wantFormatted {
+				t.Errorf("Execute(%q, %v).Formatted = %q, want %q", tt.operation, tt.args, result.Formatted, tt.wantFormatted)
+			}
+		})
+	}
+}
+
+// TestFormatted_NegativeResultsIncludeMinusSign verifies that negative results
+// are formatted with a leading minus sign and two decimal places (e.g. "-4.00").
+func TestFormatted_NegativeResultsIncludeMinusSign(t *testing.T) {
+	tests := []struct {
+		name          string
+		operation     string
+		args          []float64
+		wantFormatted string
+	}{
+		{
+			name:          "subtract(1.0, 5.0) formats as '-4.00'",
+			operation:     "subtract",
+			args:          []float64{1.0, 5.0},
+			wantFormatted: "-4.00",
+		},
+		{
+			name:          "add(-3.0, -2.0) formats as '-5.00'",
+			operation:     "add",
+			args:          []float64{-3.0, -2.0},
+			wantFormatted: "-5.00",
+		},
+		{
+			name:          "multiply(-2.0, 5.0) formats as '-10.00'",
+			operation:     "multiply",
+			args:          []float64{-2.0, 5.0},
+			wantFormatted: "-10.00",
+		},
+		{
+			name:          "divide(-9.0, 3.0) formats as '-3.00'",
+			operation:     "divide",
+			args:          []float64{-9.0, 3.0},
+			wantFormatted: "-3.00",
+		},
+	}
+	calc := arithmetic.NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := calc.Execute(tt.operation, tt.args)
+			if err != nil {
+				t.Fatalf("Execute(%q, %v) unexpected error: %v", tt.operation, tt.args, err)
+			}
+			if result.Formatted != tt.wantFormatted {
+				t.Errorf("Execute(%q, %v).Formatted = %q, want %q", tt.operation, tt.args, result.Formatted, tt.wantFormatted)
+			}
+		})
+	}
+}
+
+// TestFormatted_SmallDecimalsRoundToTwoPlaces verifies that results with more than
+// two decimal places are rounded to exactly two decimal places in Formatted.
+func TestFormatted_SmallDecimalsRoundToTwoPlaces(t *testing.T) {
+	tests := []struct {
+		name          string
+		operation     string
+		args          []float64
+		wantFormatted string
+	}{
+		{
+			name:          "divide(1.0, 3.0) = 0.333... formats as '0.33'",
+			operation:     "divide",
+			args:          []float64{1.0, 3.0},
+			wantFormatted: "0.33",
+		},
+		{
+			name:          "divide(2.0, 3.0) = 0.666... formats as '0.67'",
+			operation:     "divide",
+			args:          []float64{2.0, 3.0},
+			wantFormatted: "0.67",
+		},
+		{
+			name:          "divide(1.0, 6.0) = 0.1666... formats as '0.17'",
+			operation:     "divide",
+			args:          []float64{1.0, 6.0},
+			wantFormatted: "0.17",
+		},
+		{
+			name:          "divide(1.0, 7.0) = 0.142857... formats as '0.14'",
+			operation:     "divide",
+			args:          []float64{1.0, 7.0},
+			wantFormatted: "0.14",
+		},
+	}
+	calc := arithmetic.NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := calc.Execute(tt.operation, tt.args)
+			if err != nil {
+				t.Fatalf("Execute(%q, %v) unexpected error: %v", tt.operation, tt.args, err)
+			}
+			if result.Formatted != tt.wantFormatted {
+				t.Errorf("Execute(%q, %v).Formatted = %q, want %q", tt.operation, tt.args, result.Formatted, tt.wantFormatted)
+			}
+		})
+	}
+}
