@@ -95,8 +95,22 @@ func (v *CommandValidator) Validate(cmd Command) (*ValidatedCommand, error) {
 		args[i] = f
 	}
 
+	if err := v.validateDivisionByZero(cmd, args); err != nil {
+		return nil, err
+	}
+
 	return &ValidatedCommand{
 		Operation: cmd.Operation,
 		Args:      args,
 	}, nil
+}
+
+func (v *CommandValidator) validateDivisionByZero(cmd Command, args []float64) error {
+	if cmd.Operation == "divide" && args[1] == 0.0 {
+		return &ValidationError{
+			Kind:    ErrDivisionByZero,
+			Message: "division by zero is not allowed",
+		}
+	}
+	return nil
 }
