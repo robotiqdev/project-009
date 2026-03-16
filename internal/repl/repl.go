@@ -54,9 +54,9 @@ func (l *Loop) Run(ctx context.Context) error {
 		}
 		result, err := l.engine.Execute(cmd)
 		if err != nil {
-			fmt.Fprintln(l.out, err)
+			fmt.Fprintf(l.out, "Error: %s\n", err.Error())
 			continue
 		}
-		fmt.Fprintln(l.out, result)
+		fmt.Fprintf(l.out, "%.2f\n", result)
 	}
 }
