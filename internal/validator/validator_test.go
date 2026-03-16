@@ -134,3 +134,203 @@ func TestValidationError_KindFieldIsAccessible(t *testing.T) {
 		})
 	}
 }
+
+// dummyArgs are valid numeric string args used to avoid triggering arg-count
+// or not-a-number validators when testing operation-name validation only.
+var dummyArgs = []string{"1", "2"}
+
+// TestNewCommandValidator_ReturnsNonNil verifies the constructor returns a usable value.
+func TestNewCommandValidator_ReturnsNonNil(t *testing.T) {
+	v := validator.NewCommandValidator()
+	if v == nil {
+		t.Fatal("NewCommandValidator() returned nil")
+	}
+}
+
+// TestValidate_ValidOperations verifies that supported operation names produce no error.
+func TestValidate_ValidOperations(t *testing.T) {
+	validOps := []string{"add", "subtract", "multiply", "divide"}
+
+	v := validator.NewCommandValidator()
+
+	for _, op := range validOps {
+		t.Run(op, func(t *testing.T) {
+			_, err := v.Validate(validator.Command{Operation: op, Args: dummyArgs})
+			if err != nil {
+				t.Errorf("Validate(%q) returned unexpected error: %v", op, err)
+			}
+		})
+	}
+}
+
+// TestValidate_UnknownOperation_UppercaseVariant verifies that 'ADD' (wrong case)
+// returns a ValidationError with Kind == ErrUnknownOperation (operations are case-sensitive).
+func TestValidate_UnknownOperation_UppercaseVariant(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "ADD", Args: dummyArgs})
+	if err == nil {
+		t.Fatal("Validate(\"ADD\") expected an error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"ADD\") returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrUnknownOperation {
+		t.Errorf("ValidationError.Kind = %d, want ErrUnknownOperation (%d)", int(ve.Kind), int(validator.ErrUnknownOperation))
+	}
+}
+
+// TestValidate_UnknownOperation_Mod verifies that 'mod' (unsupported operation)
+// returns a ValidationError with Kind == ErrUnknownOperation.
+func TestValidate_UnknownOperation_Mod(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "mod", Args: dummyArgs})
+	if err == nil {
+		t.Fatal("Validate(\"mod\") expected an error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"mod\") returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrUnknownOperation {
+		t.Errorf("ValidationError.Kind = %d, want ErrUnknownOperation (%d)", int(ve.Kind), int(validator.ErrUnknownOperation))
+	}
+}
+
+// TestValidate_UnknownOperation_Empty verifies that an empty operation string
+// returns a ValidationError with Kind == ErrUnknownOperation.
+func TestValidate_UnknownOperation_Empty(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "", Args: dummyArgs})
+	if err == nil {
+		t.Fatal("Validate(\"\") expected an error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"\") returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrUnknownOperation {
+		t.Errorf("ValidationError.Kind = %d, want ErrUnknownOperation (%d)", int(ve.Kind), int(validator.ErrUnknownOperation))
+	}
+}
+
+// TestValidate_UnknownOperation_ErrorMessageContainsOperation verifies the error
+// message mentions the unrecognized operation name.
+func TestValidate_UnknownOperation_ErrorMessageContainsOperation(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "modulo", Args: dummyArgs})
+	if err == nil {
+		t.Fatal("Validate(\"modulo\") expected an error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"modulo\") returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrUnknownOperation {
+		t.Errorf("ValidationError.Kind = %d, want ErrUnknownOperation (%d)", int(ve.Kind), int(validator.ErrUnknownOperation))
+	}
+	if ve.Message == "" {
+		t.Error("ValidationError.Message is empty; expected a descriptive message")
+	}
+}
+
+// TestValidate_UnknownOperation_ErrorMessageListsSupportedOps verifies the error
+// message lists the supported operations.
+func TestValidate_UnknownOperation_ErrorMessageListsSupportedOps(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "pow", Args: dummyArgs})
+	if err == nil {
+		t.Fatal("Validate(\"pow\") expected an error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"pow\") returned error of type %T, want *validator.ValidationError", err)
+	}
+
+	msg := ve.Message
+	for _, supported := range []string{"add", "subtract", "multiply", "divide"} {
+		if !contains(msg, supported) {
+			t.Errorf("ValidationError.Message %q does not mention supported operation %q", msg, supported)
+		}
+	}
+}
+
+// TestValidate_ValidOperation_ReturnsValidatedCommand verifies that a valid operation
+// returns a non-nil ValidatedCommand.
+func TestValidate_ValidOperation_ReturnsValidatedCommand(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: dummyArgs})
+	if err != nil {
+		t.Fatalf("Validate(\"add\") unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"add\") returned nil ValidatedCommand, want non-nil")
+	}
+}
+
+// TestValidate_ValidOperation_OperationPreserved verifies the operation name is
+// preserved in the returned ValidatedCommand.
+func TestValidate_ValidOperation_OperationPreserved(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "multiply", Args: dummyArgs})
+	if err != nil {
+		t.Fatalf("Validate(\"multiply\") unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"multiply\") returned nil ValidatedCommand, want non-nil")
+	}
+	if result.Operation != "multiply" {
+		t.Errorf("ValidatedCommand.Operation = %q, want %q", result.Operation, "multiply")
+	}
+}
+
+// TestValidate_CaseSensitivity verifies that mixed-case variants are not accepted.
+func TestValidate_CaseSensitivity(t *testing.T) {
+	caseVariants := []string{"Add", "ADD", "aDd", "Subtract", "SUBTRACT", "Multiply", "MULTIPLY", "Divide", "DIVIDE"}
+
+	v := validator.NewCommandValidator()
+
+	for _, op := range caseVariants {
+		t.Run(op, func(t *testing.T) {
+			_, err := v.Validate(validator.Command{Operation: op, Args: dummyArgs})
+			if err == nil {
+				t.Errorf("Validate(%q) expected error for case-variant, got nil", op)
+				return
+			}
+			ve, ok := err.(*validator.ValidationError)
+			if !ok {
+				t.Errorf("Validate(%q) returned error of type %T, want *validator.ValidationError", op, err)
+				return
+			}
+			if ve.Kind != validator.ErrUnknownOperation {
+				t.Errorf("Validate(%q) ValidationError.Kind = %d, want ErrUnknownOperation (%d)",
+					op, int(ve.Kind), int(validator.ErrUnknownOperation))
+			}
+		})
+	}
+}
+
+// contains is a helper to check substring presence.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
+}
