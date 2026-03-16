@@ -322,6 +322,114 @@ func TestValidate_CaseSensitivity(t *testing.T) {
 	}
 }
 
+// TestValidate_ArgCount_AddWithTwoArgs verifies that 'add' with exactly 2 args succeeds.
+func TestValidate_ArgCount_AddWithTwoArgs(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1", "2"}})
+	if err != nil {
+		t.Fatalf("Validate(\"add\", [\"1\",\"2\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"add\", [\"1\",\"2\"]) returned nil, want non-nil ValidatedCommand")
+	}
+}
+
+// TestValidate_ArgCount_AddWithOneArg verifies that 'add' with 1 arg returns ErrWrongArgCount.
+func TestValidate_ArgCount_AddWithOneArg(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"1\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"1\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrWrongArgCount {
+		t.Errorf("ValidationError.Kind = %d, want ErrWrongArgCount (%d)", int(ve.Kind), int(validator.ErrWrongArgCount))
+	}
+}
+
+// TestValidate_ArgCount_AddWithThreeArgs verifies that 'add' with 3 args returns ErrWrongArgCount.
+func TestValidate_ArgCount_AddWithThreeArgs(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1", "2", "3"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"1\",\"2\",\"3\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"1\",\"2\",\"3\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrWrongArgCount {
+		t.Errorf("ValidationError.Kind = %d, want ErrWrongArgCount (%d)", int(ve.Kind), int(validator.ErrWrongArgCount))
+	}
+}
+
+// TestValidate_ArgCount_AddWithZeroArgs verifies that 'add' with 0 args returns ErrWrongArgCount.
+func TestValidate_ArgCount_AddWithZeroArgs(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", []) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", []) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrWrongArgCount {
+		t.Errorf("ValidationError.Kind = %d, want ErrWrongArgCount (%d)", int(ve.Kind), int(validator.ErrWrongArgCount))
+	}
+}
+
+// TestValidate_ArgCount_ErrorMessageContainsOperationAndCounts verifies the error
+// message mentions the operation and the expected/actual argument counts.
+func TestValidate_ArgCount_ErrorMessageContainsOperationAndCounts(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"1\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"1\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Message == "" {
+		t.Error("ValidationError.Message is empty; expected a descriptive message")
+	}
+}
+
+// TestValidate_ArgCount_WrongCountCheckedBeforeNumericParsing verifies that a wrong
+// arg count error is returned even when the args themselves are non-numeric, confirming
+// that arg count validation runs before numeric parsing.
+func TestValidate_ArgCount_WrongCountCheckedBeforeNumericParsing(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	// Single non-numeric arg: should get ErrWrongArgCount, not ErrNotANumber.
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"abc"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"abc\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"abc\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrWrongArgCount {
+		t.Errorf("ValidationError.Kind = %d, want ErrWrongArgCount (%d) (arg count must be validated before numeric parsing)",
+			int(ve.Kind), int(validator.ErrWrongArgCount))
+	}
+}
+
 // contains is a helper to check substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
