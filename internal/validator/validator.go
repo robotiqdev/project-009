@@ -89,7 +89,7 @@ func (v *CommandValidator) Validate(cmd Command) (*ValidatedCommand, error) {
 		if err != nil {
 			return nil, &ValidationError{
 				Kind:    ErrNotANumber,
-				Message: fmt.Sprintf("argument is not a number: %s", a),
+				Message: fmt.Sprintf("invalid number %q: must be a valid decimal number", a),
 			}
 		}
 		args[i] = f
