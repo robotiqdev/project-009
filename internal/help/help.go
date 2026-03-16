@@ -1,6 +1,9 @@
 package help
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // Printer is the interface for printing usage information.
 type Printer interface {
@@ -12,11 +15,12 @@ type UsagePrinter struct{}
 
 // NewUsagePrinter returns a new UsagePrinter.
 func NewUsagePrinter() *UsagePrinter {
-	return nil
+	return &UsagePrinter{}
 }
 
 // Print writes the usage text to w.
 func (u *UsagePrinter) Print(w io.Writer) {
+	fmt.Fprint(w, UsageText)
 }
 
 // UsageText contains the usage documentation for the calculator program.
