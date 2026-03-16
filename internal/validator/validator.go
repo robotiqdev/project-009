@@ -18,7 +18,7 @@ type ValidationError struct {
 
 // Error implements the error interface.
 func (e *ValidationError) Error() string {
-	return ""
+	return e.Message
 }
 
 // ValidatedCommand represents a successfully validated command with typed args.
