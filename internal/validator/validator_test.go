@@ -430,6 +430,295 @@ func TestValidate_ArgCount_WrongCountCheckedBeforeNumericParsing(t *testing.T) {
 	}
 }
 
+// --- Numeric Input Validator Tests (TASK-4473) ---
+
+// TestValidate_Numeric_DecimalArgs verifies that 'add 1.5 2.3' succeeds with
+// Args parsed to [1.5, 2.3].
+func TestValidate_Numeric_DecimalArgs(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1.5", "2.3"}})
+	if err != nil {
+		t.Fatalf("Validate(\"add\", [\"1.5\",\"2.3\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"add\", [\"1.5\",\"2.3\"]) returned nil, want non-nil ValidatedCommand")
+	}
+	if len(result.Args) != 2 {
+		t.Fatalf("ValidatedCommand.Args length = %d, want 2", len(result.Args))
+	}
+	if result.Args[0] != 1.5 {
+		t.Errorf("Args[0] = %v, want 1.5", result.Args[0])
+	}
+	if result.Args[1] != 2.3 {
+		t.Errorf("Args[1] = %v, want 2.3", result.Args[1])
+	}
+}
+
+// TestValidate_Numeric_ScientificNotation verifies that 'add 1e2 3' succeeds
+// because scientific notation is a valid float64 representation.
+func TestValidate_Numeric_ScientificNotation(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1e2", "3"}})
+	if err != nil {
+		t.Fatalf("Validate(\"add\", [\"1e2\",\"3\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"add\", [\"1e2\",\"3\"]) returned nil, want non-nil ValidatedCommand")
+	}
+	if len(result.Args) != 2 {
+		t.Fatalf("ValidatedCommand.Args length = %d, want 2", len(result.Args))
+	}
+	if result.Args[0] != 100.0 {
+		t.Errorf("Args[0] = %v, want 100.0 (1e2 parsed as float64)", result.Args[0])
+	}
+	if result.Args[1] != 3.0 {
+		t.Errorf("Args[1] = %v, want 3.0", result.Args[1])
+	}
+}
+
+// TestValidate_Numeric_FirstArgNotANumber verifies that 'add abc 2' returns
+// a ValidationError with Kind=ErrNotANumber and message mentioning 'abc'.
+func TestValidate_Numeric_FirstArgNotANumber(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"abc", "2"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"abc\",\"2\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"abc\",\"2\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrNotANumber {
+		t.Errorf("ValidationError.Kind = %d, want ErrNotANumber (%d)", int(ve.Kind), int(validator.ErrNotANumber))
+	}
+	// The message must mention the offending argument in quoted form (e.g. "abc").
+	if !contains(ve.Message, `"abc"`) {
+		t.Errorf("ValidationError.Message = %q, want it to contain %q (the bad argument quoted)", ve.Message, `"abc"`)
+	}
+}
+
+// TestValidate_Numeric_SecondArgNotANumber verifies that 'add 1 xyz' returns
+// a ValidationError with Kind=ErrNotANumber and message mentioning 'xyz'.
+func TestValidate_Numeric_SecondArgNotANumber(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1", "xyz"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"1\",\"xyz\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"add\", [\"1\",\"xyz\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrNotANumber {
+		t.Errorf("ValidationError.Kind = %d, want ErrNotANumber (%d)", int(ve.Kind), int(validator.ErrNotANumber))
+	}
+	// The message must mention the offending argument in quoted form (e.g. "xyz").
+	if !contains(ve.Message, `"xyz"`) {
+		t.Errorf("ValidationError.Message = %q, want it to contain %q (the bad argument quoted)", ve.Message, `"xyz"`)
+	}
+}
+
+// TestValidate_Numeric_ErrorMessageMentionsInvalidNumber verifies the error
+// message contains the phrase "invalid number" as specified.
+func TestValidate_Numeric_ErrorMessageMentionsInvalidNumber(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"notanumber", "2"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"notanumber\",\"2\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrNotANumber {
+		t.Errorf("ValidationError.Kind = %d, want ErrNotANumber (%d)", int(ve.Kind), int(validator.ErrNotANumber))
+	}
+	if !contains(ve.Message, "invalid number") {
+		t.Errorf("ValidationError.Message = %q, want it to contain \"invalid number\"", ve.Message)
+	}
+}
+
+// TestValidate_Numeric_ErrorMessageMentionsDecimalNumber verifies the error
+// message tells the user what format is expected.
+func TestValidate_Numeric_ErrorMessageMentionsDecimalNumber(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"abc", "2"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"abc\",\"2\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if !contains(ve.Message, "decimal number") {
+		t.Errorf("ValidationError.Message = %q, want it to contain \"decimal number\"", ve.Message)
+	}
+}
+
+// TestValidate_Numeric_FailsOnFirstInvalidArg verifies that the validator fails
+// on the first invalid argument encountered (not the second).
+func TestValidate_Numeric_FailsOnFirstInvalidArg(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	// Both args are invalid; the error message should mention the first one.
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"bad1", "bad2"}})
+	if err == nil {
+		t.Fatal("Validate(\"add\", [\"bad1\",\"bad2\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrNotANumber {
+		t.Errorf("ValidationError.Kind = %d, want ErrNotANumber (%d)", int(ve.Kind), int(validator.ErrNotANumber))
+	}
+	// Should mention first bad arg, not second.
+	if !contains(ve.Message, `"bad1"`) {
+		t.Errorf("ValidationError.Message = %q, want it to mention first bad arg %q", ve.Message, `"bad1"`)
+	}
+}
+
+// TestValidate_Numeric_IntegerArgsAreValid verifies that integer strings like "1" and "2"
+// are accepted as valid float64 values.
+func TestValidate_Numeric_IntegerArgsAreValid(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"1", "2"}})
+	if err != nil {
+		t.Fatalf("Validate(\"add\", [\"1\",\"2\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"add\", [\"1\",\"2\"]) returned nil, want non-nil ValidatedCommand")
+	}
+	if result.Args[0] != 1.0 {
+		t.Errorf("Args[0] = %v, want 1.0", result.Args[0])
+	}
+	if result.Args[1] != 2.0 {
+		t.Errorf("Args[1] = %v, want 2.0", result.Args[1])
+	}
+}
+
+// TestValidate_Numeric_NegativeNumbersAreValid verifies that negative float values
+// (with a leading minus sign) are accepted.
+func TestValidate_Numeric_NegativeNumbersAreValid(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"-1.5", "-2.3"}})
+	if err != nil {
+		t.Fatalf("Validate(\"add\", [\"-1.5\",\"-2.3\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("returned nil ValidatedCommand, want non-nil")
+	}
+	if result.Args[0] != -1.5 {
+		t.Errorf("Args[0] = %v, want -1.5", result.Args[0])
+	}
+	if result.Args[1] != -2.3 {
+		t.Errorf("Args[1] = %v, want -2.3", result.Args[1])
+	}
+}
+
+// TestValidate_Numeric_ArgCountCheckedBeforeNumericParsing verifies that an arg
+// count mismatch with non-numeric args returns ErrWrongArgCount, not ErrNotANumber.
+// This confirms the ordering: operation -> arg count -> numeric parsing.
+func TestValidate_Numeric_ArgCountCheckedBeforeNumericParsing(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	// Two non-numeric args that are also the wrong count for a hypothetical 1-arg op,
+	// but here we pass 3 non-numeric args to 'add' which expects 2.
+	_, err := v.Validate(validator.Command{Operation: "add", Args: []string{"abc", "def", "ghi"}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrWrongArgCount {
+		t.Errorf("ValidationError.Kind = %d, want ErrWrongArgCount (%d); arg count must be validated before numeric parsing",
+			int(ve.Kind), int(validator.ErrWrongArgCount))
+	}
+}
+
+// TestValidate_Numeric_AllOpsAcceptValidFloats verifies that all supported
+// operations accept valid float64 arguments without error.
+func TestValidate_Numeric_AllOpsAcceptValidFloats(t *testing.T) {
+	ops := []string{"add", "subtract", "multiply", "divide"}
+	v := validator.NewCommandValidator()
+
+	for _, op := range ops {
+		t.Run(op, func(t *testing.T) {
+			result, err := v.Validate(validator.Command{Operation: op, Args: []string{"3.14", "2.71"}})
+			if err != nil {
+				t.Errorf("Validate(%q, [\"3.14\",\"2.71\"]) unexpected error: %v", op, err)
+				return
+			}
+			if result == nil {
+				t.Errorf("Validate(%q, [\"3.14\",\"2.71\"]) returned nil, want non-nil", op)
+				return
+			}
+			if result.Args[0] != 3.14 {
+				t.Errorf("Args[0] = %v, want 3.14", result.Args[0])
+			}
+			if result.Args[1] != 2.71 {
+				t.Errorf("Args[1] = %v, want 2.71", result.Args[1])
+			}
+		})
+	}
+}
+
+// TestValidate_Numeric_AllOpsRejectNonNumericArgs verifies that all supported
+// operations reject non-numeric arguments with ErrNotANumber.
+func TestValidate_Numeric_AllOpsRejectNonNumericArgs(t *testing.T) {
+	ops := []string{"add", "subtract", "multiply", "divide"}
+	v := validator.NewCommandValidator()
+
+	for _, op := range ops {
+		t.Run(op, func(t *testing.T) {
+			_, err := v.Validate(validator.Command{Operation: op, Args: []string{"bad", "2"}})
+			if err == nil {
+				t.Errorf("Validate(%q, [\"bad\",\"2\"]) expected error, got nil", op)
+				return
+			}
+			ve, ok := err.(*validator.ValidationError)
+			if !ok {
+				t.Errorf("Validate(%q) returned error of type %T, want *validator.ValidationError", op, err)
+				return
+			}
+			if ve.Kind != validator.ErrNotANumber {
+				t.Errorf("Validate(%q) ValidationError.Kind = %d, want ErrNotANumber (%d)",
+					op, int(ve.Kind), int(validator.ErrNotANumber))
+			}
+		})
+	}
+}
+
+// TestValidate_Numeric_ValidatedCommandArgsLengthMatchesInput verifies that the
+// returned ValidatedCommand.Args slice has the same length as the input Args.
+func TestValidate_Numeric_ValidatedCommandArgsLengthMatchesInput(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "add", Args: []string{"10", "20"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Args) != 2 {
+		t.Errorf("len(ValidatedCommand.Args) = %d, want 2", len(result.Args))
+	}
+}
+
 // contains is a helper to check substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
