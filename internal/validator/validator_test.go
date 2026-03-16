@@ -719,6 +719,168 @@ func TestValidate_Numeric_ValidatedCommandArgsLengthMatchesInput(t *testing.T) {
 	}
 }
 
+// --- Division by Zero Validator Tests (TASK-4474) ---
+
+// TestValidate_DivisionByZero_IntegerZeroDivisor verifies that 'divide 5 0'
+// returns a ValidationError with Kind=ErrDivisionByZero.
+func TestValidate_DivisionByZero_IntegerZeroDivisor(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "0"}})
+	if err == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"0\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"divide\", [\"5\",\"0\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrDivisionByZero {
+		t.Errorf("ValidationError.Kind = %d, want ErrDivisionByZero (%d)", int(ve.Kind), int(validator.ErrDivisionByZero))
+	}
+}
+
+// TestValidate_DivisionByZero_FloatZeroDivisor verifies that 'divide 5 0.0'
+// returns a ValidationError with Kind=ErrDivisionByZero.
+func TestValidate_DivisionByZero_FloatZeroDivisor(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "0.0"}})
+	if err == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"0.0\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("Validate(\"divide\", [\"5\",\"0.0\"]) returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrDivisionByZero {
+		t.Errorf("ValidationError.Kind = %d, want ErrDivisionByZero (%d)", int(ve.Kind), int(validator.ErrDivisionByZero))
+	}
+}
+
+// TestValidate_DivisionByZero_ErrorMessageDescribesDivisionByZero verifies that
+// the error message is descriptive and mentions division by zero.
+func TestValidate_DivisionByZero_ErrorMessageDescribesDivisionByZero(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "0"}})
+	if err == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"0\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Message == "" {
+		t.Error("ValidationError.Message is empty; expected a descriptive message about division by zero")
+	}
+}
+
+// TestValidate_DivisionByZero_ZeroDividendIsOK verifies that 'divide 0 5'
+// is valid — a zero dividend (numerator) is allowed.
+func TestValidate_DivisionByZero_ZeroDividendIsOK(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"0", "5"}})
+	if err != nil {
+		t.Fatalf("Validate(\"divide\", [\"0\",\"5\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"divide\", [\"0\",\"5\"]) returned nil, want non-nil ValidatedCommand")
+	}
+	if result.Args[0] != 0.0 {
+		t.Errorf("Args[0] = %v, want 0.0", result.Args[0])
+	}
+	if result.Args[1] != 5.0 {
+		t.Errorf("Args[1] = %v, want 5.0", result.Args[1])
+	}
+}
+
+// TestValidate_DivisionByZero_ZeroIsValidForNonDivideOps verifies that 'add 5 0'
+// is valid — zero is allowed as an argument for non-divide operations.
+func TestValidate_DivisionByZero_ZeroIsValidForNonDivideOps(t *testing.T) {
+	ops := []string{"add", "subtract", "multiply"}
+	v := validator.NewCommandValidator()
+
+	for _, op := range ops {
+		t.Run(op, func(t *testing.T) {
+			result, err := v.Validate(validator.Command{Operation: op, Args: []string{"5", "0"}})
+			if err != nil {
+				t.Errorf("Validate(%q, [\"5\",\"0\"]) unexpected error: %v", op, err)
+				return
+			}
+			if result == nil {
+				t.Errorf("Validate(%q, [\"5\",\"0\"]) returned nil, want non-nil ValidatedCommand", op)
+			}
+		})
+	}
+}
+
+// TestValidate_DivisionByZero_NonZeroDivisorIsOK verifies that 'divide 5 1'
+// succeeds when the divisor is non-zero.
+func TestValidate_DivisionByZero_NonZeroDivisorIsOK(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	result, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "1"}})
+	if err != nil {
+		t.Fatalf("Validate(\"divide\", [\"5\",\"1\"]) unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"1\"]) returned nil, want non-nil ValidatedCommand")
+	}
+	if result.Operation != "divide" {
+		t.Errorf("ValidatedCommand.Operation = %q, want \"divide\"", result.Operation)
+	}
+	if result.Args[0] != 5.0 {
+		t.Errorf("Args[0] = %v, want 5.0", result.Args[0])
+	}
+	if result.Args[1] != 1.0 {
+		t.Errorf("Args[1] = %v, want 1.0", result.Args[1])
+	}
+}
+
+// TestValidate_DivisionByZero_CheckedAfterNumericValidation verifies that
+// division by zero check only runs after numeric validation succeeds — i.e.,
+// a non-numeric divisor returns ErrNotANumber, not ErrDivisionByZero.
+func TestValidate_DivisionByZero_CheckedAfterNumericValidation(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "abc"}})
+	if err == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"abc\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrNotANumber {
+		t.Errorf("ValidationError.Kind = %d, want ErrNotANumber (%d); division-by-zero check must run after numeric parsing",
+			int(ve.Kind), int(validator.ErrNotANumber))
+	}
+}
+
+// TestValidate_DivisionByZero_NegativeZeroDivisorIsRejected verifies that
+// 'divide 5 -0' is also caught as division by zero (negative zero parses to 0.0).
+func TestValidate_DivisionByZero_NegativeZeroDivisorIsRejected(t *testing.T) {
+	v := validator.NewCommandValidator()
+
+	_, err := v.Validate(validator.Command{Operation: "divide", Args: []string{"5", "-0"}})
+	if err == nil {
+		t.Fatal("Validate(\"divide\", [\"5\",\"-0\"]) expected error, got nil")
+	}
+
+	ve, ok := err.(*validator.ValidationError)
+	if !ok {
+		t.Fatalf("returned error of type %T, want *validator.ValidationError", err)
+	}
+	if ve.Kind != validator.ErrDivisionByZero {
+		t.Errorf("ValidationError.Kind = %d, want ErrDivisionByZero (%d)", int(ve.Kind), int(validator.ErrDivisionByZero))
+	}
+}
+
 // contains is a helper to check substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
