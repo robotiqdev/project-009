@@ -1,5 +1,24 @@
 package help
 
+import "io"
+
+// Printer is the interface for printing usage information.
+type Printer interface {
+	Print(w io.Writer)
+}
+
+// UsagePrinter implements the Printer interface.
+type UsagePrinter struct{}
+
+// NewUsagePrinter returns a new UsagePrinter.
+func NewUsagePrinter() *UsagePrinter {
+	return nil
+}
+
+// Print writes the usage text to w.
+func (u *UsagePrinter) Print(w io.Writer) {
+}
+
 // UsageText contains the usage documentation for the calculator program.
 const UsageText = `Usage: calculator [--help]
 
