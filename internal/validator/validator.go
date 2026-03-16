@@ -53,6 +53,16 @@ func NewCommandValidator() *CommandValidator {
 	return &CommandValidator{}
 }
 
+func (v *CommandValidator) validateArgCount(cmd Command, expected int) error {
+	if len(cmd.Args) != expected {
+		return &ValidationError{
+			Kind:    ErrWrongArgCount,
+			Message: fmt.Sprintf("%s requires exactly %d argument(s), got %d", cmd.Operation, expected, len(cmd.Args)),
+		}
+	}
+	return nil
+}
+
 func (v *CommandValidator) validateOperation(cmd Command) error {
 	if _, ok := validOps[cmd.Operation]; !ok {
 		return &ValidationError{
@@ -66,6 +76,10 @@ func (v *CommandValidator) validateOperation(cmd Command) error {
 // Validate validates a Command and returns a ValidatedCommand or a ValidationError.
 func (v *CommandValidator) Validate(cmd Command) (*ValidatedCommand, error) {
 	if err := v.validateOperation(cmd); err != nil {
+		return nil, err
+	}
+
+	if err := v.validateArgCount(cmd, validOps[cmd.Operation]); err != nil {
 		return nil, err
 	}
 
