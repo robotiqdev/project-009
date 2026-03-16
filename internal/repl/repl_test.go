@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/workspace/repo/internal/arithmetic"
 	"github.com/workspace/repo/internal/parser"
 	"github.com/workspace/repo/internal/repl"
+	"github.com/workspace/repo/internal/validator"
 )
 
 // --- Mock implementations ---
@@ -253,5 +255,70 @@ func TestNewReturnsNonNilLoop(t *testing.T) {
 	loop := repl.New(in, out, p, v, e)
 	if loop == nil {
 		t.Fatal("expected New to return non-nil *Loop")
+	}
+}
+
+// --- Integration tests using real concrete implementations ---
+
+// newIntegrationLoop builds a Loop wired with real NewLineParser,
+// NewCommandValidator, and NewCalculator for end-to-end testing.
+func newIntegrationLoop(input string) (*repl.Loop, *bytes.Buffer) {
+	in := strings.NewReader(input)
+	out := &bytes.Buffer{}
+	p := parser.NewLineParser()
+	v := validator.NewCommandValidator()
+	e := arithmetic.NewCalculator()
+	loop := repl.New(in, out, p, v, e)
+	return loop, out
+}
+
+// TestIntegrationAddProducesFormattedResult verifies that a full session
+// with 'add 1 2' produces output containing '3.00', confirming the wiring
+// from parser -> validator -> calculator -> formatted output.
+func TestIntegrationAddProducesFormattedResult(t *testing.T) {
+	loop, out := newIntegrationLoop("add 1 2\nexit\n")
+
+	err := loop.Run(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "3.00") {
+		t.Errorf("expected output to contain '3.00' for 'add 1 2', got: %q", output)
+	}
+}
+
+// TestIntegrationDivideProducesFormattedResult verifies that 'divide 10 4'
+// produces output containing '2.50', confirming decimal formatting in the
+// full integration pipeline.
+func TestIntegrationDivideProducesFormattedResult(t *testing.T) {
+	loop, out := newIntegrationLoop("divide 10 4\nexit\n")
+
+	err := loop.Run(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "2.50") {
+		t.Errorf("expected output to contain '2.50' for 'divide 10 4', got: %q", output)
+	}
+}
+
+// TestIntegrationDivideByZeroProducesError verifies that 'divide 5 0'
+// produces output containing 'Error: division by zero', confirming that
+// arithmetic errors are correctly propagated and printed.
+func TestIntegrationDivideByZeroProducesError(t *testing.T) {
+	loop, out := newIntegrationLoop("divide 5 0\nexit\n")
+
+	err := loop.Run(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error from Run itself, got: %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "Error: division by zero") {
+		t.Errorf("expected output to contain 'Error: division by zero' for 'divide 5 0', got: %q", output)
 	}
 }
